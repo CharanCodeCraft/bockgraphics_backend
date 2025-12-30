@@ -1,122 +1,168 @@
+// app.js
 const express = require("express");
-const fs = require("fs");
-const path = require("path");
-const PizZip = require("pizzip");
-const Docxtemplater = require("docxtemplater");
-const bodyParser = require("body-parser");
 const cors = require("cors");
+const path = require("path");
+const COMPANY_CONFIG = require("./config/letterConfig");
+const renderDoc = require("./utils/renderDoc");
 
 const app = express();
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-const COMPANY_CONFIG = {
-  Automotive: {
-    template: "Automotive.docx",
-    outputName: "Automotive_Offer_Letter.docx",
-  },
-  Foods: {
-    template: "Foods.docx",
-    outputName: "Foods_Offer_Letter.docx",
-  },
-  Space: {
-    template: "Space.docx",
-    outputName: "Space_Offer_Letter.docx",
-  },
-  Ai: {
-    template: "Ai.docx",
-    outputName: "AI_Offer_Letter.docx",
-  },
-  Health: {
-    template: "health.docx",
-    outputName: "Health_Offer_Letter.docx",
-  },
-  Chain: {
-    template: "Chain.docx",
-    outputName: "Chain_Offer_Letter.docx",
-  },
-  Institutes: {
-    template: "Institutes.docx",
-    outputName: "Institutes_Offer_Letter.docx",
-  },
-  Force: {
-    template: "Force.docx",
-    outputName: "Force_Offer_Letter.docx",
-  },
-  Parent: {
-    template: "Bock.docx",
-    outputName: "Bock_Offer_Letter.docx",
-  },
-};
+function getConfig(field) {
+  const config = COMPANY_CONFIG[field];
+  if (!config) throw new Error("Invalid company");
+  return config;
+}
 
-
+/* ================= OFFER LETTER ================= */
 app.post("/generate-offer", (req, res) => {
   try {
-    const {
-      name,
-      program,
-      issueDate,
-      startDate,
-      endDate,
-      months,
-      mode,
-      field, // e.g. "Automotive", "AI", "Bock"
-    } = req.body;
+    const { name, program, issueDate, startDate, endDate, months, mode, field } =
+      req.body;
 
-    const config = COMPANY_CONFIG[field];
-
-    if (!config) {
-      return res.status(400).json({
-        error: "Invalid company selected",
-      });
-    }
-
+    const config = getConfig(field);
     const templatePath = path.join(
       __dirname,
       "templates/offer_letter",
-      config.template
+      config.offerTemplate
     );
 
-    const content = fs.readFileSync(templatePath, "binary");
-
-    const zip = new PizZip(content);
-    const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
-      delimiters: { start: "{", end: "}" },
-    });
-
-    doc.render({
+    const buffer = renderDoc(templatePath, {
       XLAMAX: name,
       XVARIXBLEX: program,
       XDATEX: issueDate,
       XOX: months,
+      XMODEX: mode,
       XNOXNOXXXXOXX: startDate,
       YNOXNOXXXXOXY: endDate,
-      XMODEX: mode,
-    });
-
-    const buffer = doc.getZip().generate({
-      type: "nodebuffer",
-      compression: "DEFLATE",
     });
 
     res.set({
-      "Content-Disposition": `attachment; filename=${config.outputName}`,
+      "Content-Disposition": `attachment; filename=${config.display}_Offer_Letter.docx`,
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     });
-
     res.send(buffer);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Offer letter generation failed",
-      details: err.message,
-    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
+/* ================= JOINING LETTER ================= */
+app.post("/generate-joining", (req, res) => {
+  try {
+    const { name, program, issueDate, startDate, endDate, field } = req.body;
+
+    const config = getConfig(field);
+    const templatePath = path.join(
+      __dirname,
+      "templates/joining_letter",
+      config.joiningTemplate
+    );
+
+    const buffer = renderDoc(templatePath, {
+      XLAMAX: name,
+      XVARIXBLEX: program,
+      XDATEX: issueDate,
+      XNOXNOXXXXOXX: startDate,
+      YNOXNOXXXXOXY: endDate,
+    });
+
+    res.set({
+      "Content-Disposition": `attachment; filename=${config.display}_Joining_Letter.docx`,
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    res.send(buffer);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/* ================= COMPLETION CERTIFICATE ================= */
+app.post("/generate-completion-certificate", (req, res) => {
+  try {
+    const {
+      name,
+      title,
+      hours,
+      specialization,
+      courses,
+      months,
+      description,
+      field,
+    } = req.body;
+
+    const config = getConfig(field);
+    const templatePath = path.join(
+      __dirname,
+      "templates/completion_certificate",
+      config.completionCertificateTemplate
+    );
+
+    const buffer = renderDoc(templatePath, {
+      XLAMAX: name,
+      XVARIXBLEX: title,
+      XHRX: hours,
+      XSPX: specialization,
+      XCOX: courses,
+      XMOX: months,
+      XCONTENTX: description,
+    });
+
+    res.set({
+      "Content-Disposition": `attachment; filename=${config.display}_Completion_Certificate.docx`,
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    res.send(buffer);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/* ================= COMPLETION LETTER ================= */
+app.post("/generate-completion-letter", (req, res) => {
+  try {
+    const {
+      name,
+      issueDate,
+      work,
+      proficiency,
+      months,
+      startDate,
+      endDate,
+      field,
+    } = req.body;
+
+    const config = getConfig(field);
+    const templatePath = path.join(
+      __dirname,
+      "templates/completion_letter",
+      config.completionLetterTemplate
+    );
+
+    const buffer = renderDoc(templatePath, {
+      XLAMAX: name,
+      XDATEX: issueDate,
+      XVARIXBLEX: work,
+      NOXIXON: proficiency,
+      XOX: months,
+      XNOXNOXXXXOXX: startDate,
+      YNOXNOXXXXOXY: endDate,
+    });
+
+    res.set({
+      "Content-Disposition": `attachment; filename=${config.display}_Completion_Letter.docx`,
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    res.send(buffer);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.listen(3000, () =>
   console.log("Server running on http://localhost:3000")
